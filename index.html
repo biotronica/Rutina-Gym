@@ -103,10 +103,44 @@ input[type=number]{width:100%;min-width:0;font:500 16px var(--mono);padding:7px 
 .pick.today{border-color:var(--h-blue);box-shadow:inset 0 0 0 1px var(--h-blue)}
 .back{background:none;border:none;color:var(--muted);font:500 14px var(--body);cursor:pointer;padding:6px 0}
 .topbar{display:flex;justify-content:space-between;align-items:center}
+
+/* Pantalla de carga con remero animado */
+:root{--sp-bg:#eaeff6;--sp-sky:#86aedb;--sp-body:#5b5c55;--sp-lime:#97c94a;--sp-ink:#1d2430}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sp-bg:#121722;--sp-sky:#3f6694;--sp-body:#2b2d29;--sp-lime:#a6d85a;--sp-ink:#e8edf6}}
+:root[data-theme="dark"]{--sp-bg:#121722;--sp-sky:#3f6694;--sp-body:#2b2d29;--sp-lime:#a6d85a;--sp-ink:#e8edf6}
+#splash{position:fixed;inset:0;z-index:50;background:var(--sp-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .45s ease}
+#splash.out{opacity:0;pointer-events:none}
+#splash svg{width:min(78vw,340px);height:auto}
+#splash .sp-name{font:400 44px/1 var(--anton);letter-spacing:.06em;text-transform:uppercase;color:var(--sp-ink)}
+#splash .sp-load{font:500 12px var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--h-muted)}
+#splash .sp-dots{display:inline-block;width:1.6em;text-align:left}
 </style>
 </head>
 <body>
 
+<div id="splash" aria-label="Cargando">
+  <svg viewBox="0 0 400 400" aria-hidden="true">
+    <defs><clipPath id="spc"><circle cx="200" cy="200" r="182"/></clipPath></defs>
+    <circle cx="200" cy="200" r="182" fill="var(--sp-sky)"/>
+    <g clip-path="url(#spc)">
+      <path d="M40 300 L250 300 L330 250 L420 250 L420 420 L-20 420 L-20 300 Z" fill="var(--sp-body)"/>
+      <path d="M60 300 L240 300" stroke="var(--sp-lime)" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="spMon"><path d="M268 182 L236 126" stroke="var(--sp-body)" stroke-width="12" stroke-linecap="round"/><rect x="214" y="96" width="38" height="34" rx="3" fill="var(--sp-body)"/><rect x="220" y="102" width="26" height="14" rx="2" fill="var(--sp-lime)" opacity=".85"/></g>
+    <g id="spWheel">
+      <circle cx="318" cy="228" r="86" fill="var(--sp-body)"/>
+      <path d="M318 148 A80 80 0 0 1 318 308" fill="none" stroke="var(--sp-lime)" stroke-width="9" stroke-linecap="round"/>
+      <g id="spSpin"><path d="M300 210 A26 26 0 0 1 300 246" fill="none" stroke="var(--sp-lime)" stroke-width="7" stroke-linecap="round"/><path d="M336 246 A26 26 0 0 1 336 210" fill="none" stroke="var(--sp-lime)" stroke-width="7" stroke-linecap="round" opacity=".6"/></g>
+    </g>
+    <line id="spChain" stroke="var(--sp-body)" stroke-width="5" stroke-linecap="round"/>
+    <g id="spRim" fill="none" stroke="var(--sp-lime)" stroke-linecap="round" stroke-linejoin="round" transform="translate(-4 3)"></g>
+    <g id="spFig" fill="none" stroke="var(--sp-body)" stroke-linecap="round" stroke-linejoin="round"></g>
+    <rect id="spSeat" width="46" height="12" rx="4" fill="var(--sp-body)"/>
+    <rect x="236" y="262" width="16" height="40" rx="4" fill="var(--sp-body)" transform="rotate(-18 244 282)"/>
+  </svg>
+  <div class="sp-name">Rutina</div>
+  <div class="sp-load">Calentando<span class="sp-dots" id="spDots"></span></div>
+</div>
 <section id="home" aria-label="Inicio">
   <svg class="arc" viewBox="0 0 520 150" role="img" aria-label="Bitácora de sala"><path id="arcp" d="M 30 140 Q 260 -20 490 140" fill="none"/><text text-anchor="middle"><textPath href="#arcp" startOffset="50%" id="arcText">Bitácora de sala</textPath></text></svg>
   <div class="stage">
@@ -299,6 +333,56 @@ function showHome(picker){
 function enterDay(k){day=k;$('#home').hidden=true;$('#main').hidden=false;render();window.scrollTo(0,0);}
 
 if(deep){enterDay(day);}else{showHome(false);}
+</script>
+<script>
+(function(){
+  const sp=document.getElementById('splash');if(!sp)return;
+  const fig=document.getElementById('spFig'),rim=document.getElementById('spRim'),seat=document.getElementById('spSeat'),chain=document.getElementById('spChain'),spin=document.getElementById('spSpin'),dots=document.getElementById('spDots');
+  const NS='http://www.w3.org/2000/svg';
+  const mk=(g,w)=>{const p=document.createElementNS(NS,'path');p.setAttribute('stroke-width',w);g.appendChild(p);return p;};
+  const parts=w=>({leg:mk(w.g,w.leg),torso:mk(w.g,w.torso),arm:mk(w.g,w.arm)});
+  const F=parts({g:fig,leg:20,torso:34,arm:14}),R=parts({g:rim,leg:20,torso:34,arm:14});
+  const head=document.createElementNS(NS,'circle');head.setAttribute('r','19');head.setAttribute('fill','var(--sp-body)');fig.appendChild(head);
+  const headR=document.createElementNS(NS,'circle');headR.setAttribute('r','19');headR.setAttribute('fill','var(--sp-lime)');rim.appendChild(headR);
+  const ss=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  // IK de dos segmentos; dir=+1 dobla hacia arriba, -1 hacia abajo
+  function ik(ax,ay,bx,by,l1,l2,dir){const dx=bx-ax,dy=by-ay;let d=Math.hypot(dx,dy);d=Math.min(d,l1+l2-0.01);const a=Math.atan2(dy,dx);const c=Math.acos((l1*l1+d*d-l2*l2)/(2*l1*d));const ang=a-dir*c;return [ax+Math.cos(ang)*l1,ay+Math.sin(ang)*l1];}
+  const ANK=[238,268],HANDLE=[262,226];
+  function pose(p){
+    let legs,lean,arms;
+    if(p<0.4){const d=p/0.4;legs=ss(0,.6,d);lean=ss(.3,.8,d);arms=ss(.55,1,d);}
+    else{const r=(p-0.4)/0.6;arms=1-ss(0,.35,r);lean=1-ss(.2,.6,r);legs=1-ss(.5,1,r);}
+    const hip=[lerp(178,108,legs),266];
+    const knee=ik(hip[0],hip[1],ANK[0],ANK[1],78,70,1);
+    const ta=(lerp(28,-26,lean))*Math.PI/180;
+    const sh=[hip[0]+Math.sin(ta)*88,hip[1]-Math.cos(ta)*88];
+    const hd=[sh[0]+Math.sin(ta)*30,sh[1]-Math.cos(ta)*30];
+    const toH=Math.atan2(HANDLE[1]-sh[1],HANDLE[0]-sh[0]);
+    const reach=[sh[0]+Math.cos(toH)*92,sh[1]+Math.sin(toH)*92];
+    const pulled=[hip[0]+40,hip[1]-58];
+    const hand=[lerp(reach[0],pulled[0],arms),lerp(reach[1],pulled[1],arms)];
+    const el=ik(sh[0],sh[1],hand[0],hand[1],50,48,-1);
+    const L=`M${hip} L${knee} L${ANK}`,T=`M${hip} L${sh}`,A=`M${sh} L${el} L${hand}`;
+    for(const o of[F,R]){o.leg.setAttribute('d',L);o.torso.setAttribute('d',T);o.arm.setAttribute('d',A);}
+    head.setAttribute('cx',hd[0]);head.setAttribute('cy',hd[1]);headR.setAttribute('cx',hd[0]);headR.setAttribute('cy',hd[1]);
+    seat.setAttribute('x',hip[0]-26);seat.setAttribute('y',hip[1]+8);
+    chain.setAttribute('x1',hand[0]);chain.setAttribute('y1',hand[1]);chain.setAttribute('x2',300);chain.setAttribute('y2',228);
+    return legs;
+  }
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const t0=performance.now();let ang=0,last=t0,raf;
+  function frame(now){
+    const p=((now-t0)/1600)%1;const legs=pose(p);
+    ang+=(now-last)*(p<0.4?0.9:0.35);last=now;spin.setAttribute('transform',`rotate(${ang%360} 318 228)`);
+    dots.textContent='.'.repeat(1+Math.floor((now-t0)/350)%3);
+    raf=requestAnimationFrame(frame);
+  }
+  if(reduce){pose(0.3);}else{raf=requestAnimationFrame(frame);}
+  const MIN=reduce?600:2400;
+  function hide(){const wait=Math.max(0,MIN-(performance.now()-t0));setTimeout(()=>{sp.classList.add('out');setTimeout(()=>{cancelAnimationFrame(raf);sp.hidden=true;},480);},wait);}
+  if(document.readyState==='complete')hide();else addEventListener('load',hide);
+})();
 </script>
 
 <script>
